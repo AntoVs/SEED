@@ -60,6 +60,11 @@ Then open `index.html`.
 
 ![Completion](assets/images/Completion.png)
 
+### Theming
+
+<img width="257" height="178" alt="image" src="https://github.com/user-attachments/assets/752c2662-eeb5-4261-bc6b-36f3a00f20de" />
+
+
 ## Future Improvements
 
 - Backend integration
