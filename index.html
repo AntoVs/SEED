@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <canvas class="particle-canvas" id="particleCanvas" aria-hidden="true"></canvas>
   <div class="app-shell">
     <header class="top-navbar">
       <div class="brand-block" aria-label="Application">
@@ -19,18 +20,23 @@
       </div>
 
       <nav class="status-strip" aria-label="Quiz status">
-        <div class="status-item">
-          <span>Current Team</span>
+        <div class="status-item current-team-status" id="currentTeamStatus">
+          <span>Now Playing</span>
           <strong id="currentTeamLabel">No teams</strong>
         </div>
         <div class="status-item">
           <span>Current Round</span>
           <strong id="currentRoundLabel">Round 1</strong>
         </div>
-        <button class="theme-toggle" id="darkModeToggle" type="button" aria-pressed="false">
-          <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
-          <span>Dark Mode</span>
-        </button>
+        <label class="theme-selector" for="themeSelect">
+          <span>Theme</span>
+          <select id="themeSelect" aria-label="Select theme">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="gruvbox-dark">Gruvbox Dark</option>
+            <option value="gruvbox-light">Gruvbox Light</option>
+          </select>
+        </label>
       </nav>
     </header>
 
@@ -41,7 +47,15 @@
             <p class="eyebrow">Quiz Board</p>
             <h2 id="quizBoardHeading">Categories</h2>
           </div>
-          <span class="board-progress" id="boardProgress">0 / 16 completed</span>
+          <div class="board-progress" id="boardProgress">
+            <div class="progress-meta">
+              <strong id="progressPercent">0%</strong>
+              <span id="questionsRemaining">16 remaining</span>
+            </div>
+            <div class="progress-track" aria-label="Quiz completion progress">
+              <span class="progress-fill" id="progressFill"></span>
+            </div>
+          </div>
         </div>
         <div class="quiz-board" id="quizBoard" aria-live="polite"></div>
       </section>
@@ -64,12 +78,13 @@
           <h2 id="adminHeading">Manage Teams and Scores</h2>
         </div>
         <div class="turn-actions" aria-label="Turn controls">
+          <button class="button button-secondary collapse-button" id="adminCollapseButton" type="button" aria-expanded="true" aria-controls="adminContent">▾ Controls</button>
           <button class="button button-secondary" id="previousTeamButton" type="button">Previous Team</button>
           <button class="button button-primary" id="nextTeamButton" type="button">Next Team</button>
         </div>
       </div>
 
-      <div class="admin-grid">
+      <div class="admin-grid" id="adminContent">
         <form class="team-form" id="teamForm" aria-label="Add team">
           <label for="teamNameInput">Team Name</label>
           <div class="input-row">
@@ -149,6 +164,32 @@
   </dialog>
 
   <div class="toast-region" id="toastRegion" aria-live="assertive" aria-atomic="true"></div>
+
+  <section class="winner-overlay" id="winnerOverlay" aria-labelledby="winnerTitle" aria-hidden="true">
+    <canvas class="confetti-canvas" id="confettiCanvas" aria-hidden="true"></canvas>
+    <div class="winner-card">
+      <div class="trophy-icon" aria-hidden="true">🏆</div>
+      <p class="eyebrow">Quiz Completed</p>
+      <h2 id="winnerTitle">QUIZ COMPLETED</h2>
+      <div class="winner-details">
+        <span>Winner Team</span>
+        <strong id="winnerTeamName">Team</strong>
+        <span>Final Score</span>
+        <strong id="winnerScore">0</strong>
+      </div>
+      <p class="winner-message">Congratulations on finishing the 0 Points Quiz.</p>
+      <div class="winner-actions">
+        <button class="button button-primary" id="winnerRestartButton" type="button">↻ Restart Quiz</button>
+        <button class="button button-secondary" id="winnerCloseButton" type="button">Close</button>
+      </div>
+      <div class="icon-attribution">
+        <a href="https://www.flaticon.com/free-icons/winner" title="winner icons">Winner icons created by Freepik - Flaticon</a>
+        <a href="https://www.flaticon.com/free-icons/medal" title="medal icons">Medal icons created by Freepik - Flaticon</a>
+        <a href="https://www.flaticon.com/free-icons/second" title="second icons">Second icons created by Freepik - Flaticon</a>
+        <a href="https://www.flaticon.com/free-icons/third" title="third icons">Third icons created by Freepik - Flaticon</a>
+      </div>
+    </div>
+  </section>
 
   <script src="js/script.js"></script>
 </body>

@@ -6,15 +6,20 @@
   const CATEGORIES = ["Tech", "Sports", "Rajagiri", "Entertainment"];
   const POINTS = [20, 40, 60, 80];
   const SCORE_ADJUSTMENTS = [20, -20, 40, -40, 60, -60, 80, -80];
+  const TOTAL_QUESTIONS = CATEGORIES.length * POINTS.length;
+  const THEMES = ["light", "dark", "gruvbox-dark", "gruvbox-light"];
+  const MEDALS = ["🥇", "🥈", "🥉"];
 
   const elements = {
     body: document.body,
     quizBoard: document.getElementById("quizBoard"),
-    boardProgress: document.getElementById("boardProgress"),
     leaderboardList: document.getElementById("leaderboardList"),
     currentTeamLabel: document.getElementById("currentTeamLabel"),
     currentRoundLabel: document.getElementById("currentRoundLabel"),
-    darkModeToggle: document.getElementById("darkModeToggle"),
+    themeSelect: document.getElementById("themeSelect"),
+    progressPercent: document.getElementById("progressPercent"),
+    questionsRemaining: document.getElementById("questionsRemaining"),
+    progressFill: document.getElementById("progressFill"),
     teamForm: document.getElementById("teamForm"),
     teamNameInput: document.getElementById("teamNameInput"),
     teamMembersInput: document.getElementById("teamMembersInput"),
@@ -24,6 +29,8 @@
     removeTeamButton: document.getElementById("removeTeamButton"),
     resetScoresButton: document.getElementById("resetScoresButton"),
     resetQuizButton: document.getElementById("resetQuizButton"),
+    adminPanel: document.querySelector(".admin-panel"),
+    adminCollapseButton: document.getElementById("adminCollapseButton"),
     nextTeamButton: document.getElementById("nextTeamButton"),
     previousTeamButton: document.getElementById("previousTeamButton"),
     scoreAdjustmentButtons: document.getElementById("scoreAdjustmentButtons"),
@@ -41,7 +48,14 @@
     cancelConfirmButton: document.getElementById("cancelConfirmButton"),
     cancelConfirmIcon: document.getElementById("cancelConfirmIcon"),
     toastRegion: document.getElementById("toastRegion"),
-    storageStatus: document.getElementById("storageStatus")
+    storageStatus: document.getElementById("storageStatus"),
+    particleCanvas: document.getElementById("particleCanvas"),
+    winnerOverlay: document.getElementById("winnerOverlay"),
+    winnerTeamName: document.getElementById("winnerTeamName"),
+    winnerScore: document.getElementById("winnerScore"),
+    winnerRestartButton: document.getElementById("winnerRestartButton"),
+    winnerCloseButton: document.getElementById("winnerCloseButton"),
+    confettiCanvas: document.getElementById("confettiCanvas")
   };
 
   let state = loadState();
@@ -49,6 +63,8 @@
   let pendingConfirmAction = null;
   let previousLeaderboardOrder = [];
   let storageAvailable = true;
+  let winnerShownForCompletion = false;
+  let confettiController = null;
 
   // State creation and persistence
   function createDefaultState() {
@@ -62,7 +78,8 @@
       currentTeamIndex: 0,
       round: 1,
       completedQuestions: [],
-      darkMode: false
+      theme: "light",
+      adminCollapsed: false
     };
   }
 
@@ -92,7 +109,8 @@
         currentTeamIndex: Number.isInteger(savedState.currentTeamIndex) ? savedState.currentTeamIndex : 0,
         round: Number.isInteger(savedState.round) ? savedState.round : 1,
         completedQuestions: Array.isArray(savedState.completedQuestions) ? savedState.completedQuestions : [],
-        darkMode: Boolean(savedState.darkMode)
+        theme: normalizeTheme(savedState.theme || (savedState.darkMode ? "dark" : "light")),
+        adminCollapsed: Boolean(savedState.adminCollapsed)
       };
     } catch (error) {
       return createDefaultState();
@@ -122,15 +140,17 @@
     renderQuizBoard();
     renderTeamControls();
     renderLeaderboard();
+    renderAdminPanel();
     updateActionStates();
+    checkQuizCompletion();
     if (shouldPersist) {
       saveState();
     }
   }
 
   function renderTheme() {
-    elements.body.classList.toggle("dark-mode", state.darkMode);
-    elements.darkModeToggle.setAttribute("aria-pressed", String(state.darkMode));
+    elements.body.dataset.theme = normalizeTheme(state.theme);
+    elements.themeSelect.value = normalizeTheme(state.theme);
   }
 
   function renderStatus() {
@@ -142,6 +162,8 @@
   function renderQuizBoard() {
     const fragment = document.createDocumentFragment();
     const completedCount = state.completedQuestions.length;
+    const remainingCount = TOTAL_QUESTIONS - completedCount;
+    const completionPercent = Math.round((completedCount / TOTAL_QUESTIONS) * 100);
 
     CATEGORIES.forEach((category) => {
       const column = document.createElement("div");
@@ -162,7 +184,7 @@
         button.dataset.category = category;
         button.dataset.points = String(points);
         button.disabled = state.completedQuestions.includes(questionId);
-        button.setAttribute("aria-label", `${category} for ${points} points`);
+        button.setAttribute("aria-label", `${category} for ${points} points${button.disabled ? " completed" : ""}`);
         column.appendChild(button);
       });
 
@@ -170,7 +192,9 @@
     });
 
     elements.quizBoard.replaceChildren(fragment);
-    elements.boardProgress.textContent = `${completedCount} / ${CATEGORIES.length * POINTS.length} completed`;
+    elements.progressPercent.textContent = `${completionPercent}%`;
+    elements.questionsRemaining.textContent = `${remainingCount} remaining`;
+    elements.progressFill.style.width = `${completionPercent}%`;
   }
 
   function renderTeamControls() {
@@ -205,18 +229,24 @@
       if (team.id === getCurrentTeam()?.id) {
         item.classList.add("is-current");
       }
+      if (index === 0) {
+        item.classList.add("is-leader");
+      }
 
       const previousIndex = previousLeaderboardOrder.indexOf(team.id);
       if (previousIndex !== -1 && previousIndex !== index) {
-        item.style.transform = previousIndex > index ? "translateY(8px)" : "translateY(-8px)";
+        item.style.transform = previousIndex > index ? "translate3d(0, 12px, 0)" : "translate3d(0, -12px, 0)";
         requestAnimationFrame(() => {
-          item.style.transform = "translateY(0)";
+          item.style.transform = "translate3d(0, 0, 0)";
         });
       }
 
       const rank = document.createElement("span");
       rank.className = "rank";
-      rank.textContent = String(index + 1);
+      if (MEDALS[index]) {
+        rank.classList.add("rank-medal");
+      }
+      rank.textContent = MEDALS[index] || String(index + 1);
 
       const details = document.createElement("div");
       details.className = "team-details";
@@ -236,6 +266,12 @@
 
     elements.leaderboardList.replaceChildren(fragment);
     previousLeaderboardOrder = sortedTeams.map((team) => team.id);
+  }
+
+  function renderAdminPanel() {
+    elements.adminPanel.classList.toggle("is-collapsed", state.adminCollapsed);
+    elements.adminCollapseButton.setAttribute("aria-expanded", String(!state.adminCollapsed));
+    elements.adminCollapseButton.textContent = state.adminCollapsed ? "▸ Controls" : "▾ Controls";
   }
 
   function updateActionStates() {
@@ -272,7 +308,8 @@
     });
     elements.nextTeamButton.addEventListener("click", nextTeam);
     elements.previousTeamButton.addEventListener("click", previousTeam);
-    elements.darkModeToggle.addEventListener("click", toggleDarkMode);
+    elements.themeSelect.addEventListener("change", handleThemeChange);
+    elements.adminCollapseButton.addEventListener("click", toggleAdminPanel);
     elements.closeAnswerModal.addEventListener("click", closeAnswerModal);
     elements.correctButton.addEventListener("click", () => recordAnswer("correct"));
     elements.wrongButton.addEventListener("click", () => recordAnswer("wrong"));
@@ -280,6 +317,11 @@
     elements.confirmActionButton.addEventListener("click", confirmPendingAction);
     elements.cancelConfirmButton.addEventListener("click", closeConfirmModal);
     elements.cancelConfirmIcon.addEventListener("click", closeConfirmModal);
+    elements.winnerRestartButton.addEventListener("click", () => {
+      hideWinnerScreen();
+      openConfirm("Restart the quiz and restore the default teams?", resetQuiz);
+    });
+    elements.winnerCloseButton.addEventListener("click", hideWinnerScreen);
     document.addEventListener("keydown", handleKeyboardShortcuts);
   }
 
@@ -288,7 +330,7 @@
       const button = document.createElement("button");
       button.className = `button ${adjustment > 0 ? "button-warning" : "button-success"}`;
       button.type = "button";
-      button.textContent = adjustment > 0 ? `+${adjustment}` : String(adjustment);
+      button.textContent = `${adjustment > 0 ? "＋" : "－"} ${Math.abs(adjustment)}`;
       button.addEventListener("click", () => adjustSelectedTeamScore(adjustment));
       return button;
     });
@@ -475,6 +517,8 @@
 
   function resetQuiz() {
     state = createDefaultState();
+    winnerShownForCompletion = false;
+    hideWinnerScreen();
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch (error) {
@@ -485,9 +529,40 @@
     render(false);
   }
 
-  function toggleDarkMode() {
-    state.darkMode = !state.darkMode;
+  function handleThemeChange() {
+    state.theme = normalizeTheme(elements.themeSelect.value);
     render();
+  }
+
+  function toggleAdminPanel() {
+    state.adminCollapsed = !state.adminCollapsed;
+    render();
+  }
+
+  function checkQuizCompletion() {
+    if (state.completedQuestions.length === TOTAL_QUESTIONS && !winnerShownForCompletion) {
+      showWinnerScreen();
+    }
+  }
+
+  function showWinnerScreen() {
+    const winner = getSortedTeams()[0];
+    if (!winner) {
+      return;
+    }
+
+    winnerShownForCompletion = true;
+    elements.winnerTeamName.textContent = winner.name;
+    elements.winnerScore.textContent = String(winner.score);
+    elements.winnerOverlay.classList.add("is-visible");
+    elements.winnerOverlay.setAttribute("aria-hidden", "false");
+    startConfetti();
+  }
+
+  function hideWinnerScreen() {
+    elements.winnerOverlay.classList.remove("is-visible");
+    elements.winnerOverlay.setAttribute("aria-hidden", "true");
+    stopConfetti();
   }
 
   // Modal and notification helpers
@@ -548,6 +623,9 @@
     if (elements.confirmModal.open) {
       closeConfirmModal();
     }
+    if (elements.winnerOverlay.classList.contains("is-visible")) {
+      hideWinnerScreen();
+    }
   }
 
   function showToast(message) {
@@ -575,6 +653,14 @@
     }
 
     return `team-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function normalizeTheme(theme) {
+    return THEMES.includes(theme) ? theme : "light";
+  }
+
+  function getThemeColor(variableName) {
+    return getComputedStyle(elements.body).getPropertyValue(variableName).trim();
   }
 
   function getQuestionId(category, points) {
@@ -613,9 +699,204 @@
     }
   }
 
+  function createParticleBackground(canvas) {
+    const context = canvas.getContext("2d");
+    const particles = [];
+    const pointer = { x: -9999, y: -9999 };
+    let width = 0;
+    let height = 0;
+    let animationId = 0;
+
+    function resize() {
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * pixelRatio);
+      canvas.height = Math.floor(height * pixelRatio);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+
+      const targetCount = Math.min(70, Math.max(28, Math.floor((width * height) / 22000)));
+      particles.length = 0;
+      for (let index = 0; index < targetCount; index += 1) {
+        particles.push(createParticle(width, height));
+      }
+    }
+
+    function draw() {
+      const particleColor = getThemeColor("--particle") || "rgba(29, 111, 143, 0.3)";
+      context.clearRect(0, 0, width, height);
+
+      particles.forEach((particle, index) => {
+        const dx = pointer.x - particle.x;
+        const dy = pointer.y - particle.y;
+        const pointerDistance = Math.hypot(dx, dy);
+        if (pointerDistance < 130) {
+          particle.x -= dx * 0.002;
+          particle.y -= dy * 0.002;
+        }
+
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+
+        if (particle.x < 0 || particle.x > width) {
+          particle.vx *= -1;
+        }
+        if (particle.y < 0 || particle.y > height) {
+          particle.vy *= -1;
+        }
+
+        context.beginPath();
+        context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+        context.fillStyle = particleColor;
+        context.fill();
+
+        for (let nextIndex = index + 1; nextIndex < particles.length; nextIndex += 1) {
+          const other = particles[nextIndex];
+          const distance = Math.hypot(particle.x - other.x, particle.y - other.y);
+          if (distance < 120) {
+            context.globalAlpha = 1 - distance / 120;
+            context.strokeStyle = particleColor;
+            context.lineWidth = 1;
+            context.beginPath();
+            context.moveTo(particle.x, particle.y);
+            context.lineTo(other.x, other.y);
+            context.stroke();
+            context.globalAlpha = 1;
+          }
+        }
+      });
+
+      animationId = requestAnimationFrame(draw);
+    }
+
+    function handlePointerMove(event) {
+      pointer.x = event.clientX;
+      pointer.y = event.clientY;
+    }
+
+    function handlePointerLeave() {
+      pointer.x = -9999;
+      pointer.y = -9999;
+    }
+
+    resize();
+    window.addEventListener("resize", resize);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerleave", handlePointerLeave);
+    animationId = requestAnimationFrame(draw);
+
+    return {
+      stop() {
+        cancelAnimationFrame(animationId);
+        window.removeEventListener("resize", resize);
+        window.removeEventListener("pointermove", handlePointerMove);
+        window.removeEventListener("pointerleave", handlePointerLeave);
+      }
+    };
+  }
+
+  function createParticle(width, height) {
+    return {
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.5) * 0.28,
+      vy: (Math.random() - 0.5) * 0.28,
+      radius: Math.random() * 1.5 + 1
+    };
+  }
+
+  function startConfetti() {
+    stopConfetti();
+
+    const canvas = elements.confettiCanvas;
+    const context = canvas.getContext("2d");
+    const pieces = [];
+    const colors = [getThemeColor("--gold"), getThemeColor("--primary"), getThemeColor("--success"), getThemeColor("--danger"), getThemeColor("--warning")];
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    let animationId = 0;
+    let startTime = performance.now();
+
+    function resize() {
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * pixelRatio);
+      canvas.height = Math.floor(height * pixelRatio);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    }
+
+    function seedPieces() {
+      for (let index = 0; index < 120; index += 1) {
+        pieces.push({
+          x: Math.random() * width,
+          y: -20 - Math.random() * height * 0.35,
+          size: Math.random() * 7 + 4,
+          speed: Math.random() * 2.4 + 1.8,
+          drift: (Math.random() - 0.5) * 1.6,
+          rotation: Math.random() * Math.PI,
+          spin: (Math.random() - 0.5) * 0.18,
+          color: colors[index % colors.length] || "#d79921"
+        });
+      }
+    }
+
+    function draw(now) {
+      context.clearRect(0, 0, width, height);
+      pieces.forEach((piece) => {
+        piece.x += piece.drift;
+        piece.y += piece.speed;
+        piece.rotation += piece.spin;
+
+        context.save();
+        context.translate(piece.x, piece.y);
+        context.rotate(piece.rotation);
+        context.fillStyle = piece.color;
+        context.fillRect(-piece.size / 2, -piece.size / 2, piece.size, piece.size * 0.62);
+        context.restore();
+
+        if (piece.y > height + 30) {
+          piece.y = -20;
+          piece.x = Math.random() * width;
+        }
+      });
+
+      if (now - startTime < 4200) {
+        animationId = requestAnimationFrame(draw);
+      } else {
+        stopConfetti();
+      }
+    }
+
+    resize();
+    seedPieces();
+    window.addEventListener("resize", resize);
+    animationId = requestAnimationFrame(draw);
+
+    confettiController = {
+      stop() {
+        cancelAnimationFrame(animationId);
+        window.removeEventListener("resize", resize);
+        context.clearRect(0, 0, width, height);
+      }
+    };
+  }
+
+  function stopConfetti() {
+    if (confettiController) {
+      confettiController.stop();
+      confettiController = null;
+    }
+  }
+
   function init() {
     buildScoreButtons();
     bindEvents();
+    createParticleBackground(elements.particleCanvas);
     render();
   }
 
