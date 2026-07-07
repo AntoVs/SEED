@@ -40,11 +40,11 @@ A frontend web application built to manage the **0 Points Quiz** event. It provi
 Clone the repository and open `index.html` in your browser.
 
 ```bash
-git clone <repository-url>
-cd 0-points-quiz
+git clone https://github.com/AntoVs/SEED.git
+cd SEED
 ```
 
-Then open `index.html`.
+open `index.html`.
 
 ## Screenshots
 
