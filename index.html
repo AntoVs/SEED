@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="0 Points Quiz Manager dashboard for event quiz scoring and turn management.">
+  <title>0 Points Quiz Manager</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="top-navbar">
+      <div class="brand-block" aria-label="Application">
+        <span class="brand-mark" aria-hidden="true">0</span>
+        <div>
+          <h1>0 Points Quiz Manager</h1>
+          <p>Event dashboard</p>
+        </div>
+      </div>
+
+      <nav class="status-strip" aria-label="Quiz status">
+        <div class="status-item">
+          <span>Current Team</span>
+          <strong id="currentTeamLabel">No teams</strong>
+        </div>
+        <div class="status-item">
+          <span>Current Round</span>
+          <strong id="currentRoundLabel">Round 1</strong>
+        </div>
+        <button class="theme-toggle" id="darkModeToggle" type="button" aria-pressed="false">
+          <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+          <span>Dark Mode</span>
+        </button>
+      </nav>
+    </header>
+
+    <main class="dashboard-layout">
+      <section class="quiz-panel" aria-labelledby="quizBoardHeading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Quiz Board</p>
+            <h2 id="quizBoardHeading">Categories</h2>
+          </div>
+          <span class="board-progress" id="boardProgress">0 / 16 completed</span>
+        </div>
+        <div class="quiz-board" id="quizBoard" aria-live="polite"></div>
+      </section>
+
+      <aside class="leaderboard-panel" aria-labelledby="leaderboardHeading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Leaderboard</p>
+            <h2 id="leaderboardHeading">Lowest Score Wins</h2>
+          </div>
+        </div>
+        <ol class="leaderboard-list" id="leaderboardList" aria-live="polite"></ol>
+      </aside>
+    </main>
+
+    <section class="admin-panel" aria-labelledby="adminHeading">
+      <div class="section-heading admin-heading">
+        <div>
+          <p class="eyebrow">Admin Controls</p>
+          <h2 id="adminHeading">Manage Teams and Scores</h2>
+        </div>
+        <div class="turn-actions" aria-label="Turn controls">
+          <button class="button button-secondary" id="previousTeamButton" type="button">Previous Team</button>
+          <button class="button button-primary" id="nextTeamButton" type="button">Next Team</button>
+        </div>
+      </div>
+
+      <div class="admin-grid">
+        <form class="team-form" id="teamForm" aria-label="Add team">
+          <label for="teamNameInput">Team Name</label>
+          <div class="input-row">
+            <input id="teamNameInput" name="teamName" type="text" placeholder="Add team name" autocomplete="off" required>
+            <button class="button button-primary" type="submit">Add Team</button>
+          </div>
+          <label for="teamMembersInput">Members</label>
+          <textarea id="teamMembersInput" name="teamMembers" rows="3" placeholder="Optional members"></textarea>
+        </form>
+
+        <div class="team-manager">
+          <div class="control-row">
+            <label for="teamSelect">Selected Team</label>
+            <select id="teamSelect"></select>
+          </div>
+          <div class="control-row">
+            <label for="editTeamNameInput">Edit Name</label>
+            <div class="input-row">
+              <input id="editTeamNameInput" type="text" placeholder="Team name">
+              <button class="button button-secondary" id="saveTeamButton" type="button">Save</button>
+            </div>
+          </div>
+          <div class="button-row">
+            <button class="button button-danger" id="removeTeamButton" type="button">Remove Team</button>
+            <button class="button button-warning" id="resetScoresButton" type="button">Reset Scores</button>
+            <button class="button button-danger" id="resetQuizButton" type="button">Reset Quiz</button>
+          </div>
+        </div>
+
+        <div class="score-adjuster" aria-labelledby="scoreAdjustHeading">
+          <h3 id="scoreAdjustHeading">Manual Score Adjustment</h3>
+          <div class="score-buttons" id="scoreAdjustmentButtons"></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="app-footer">
+      <span>Keyboard: Left/Right arrows change team, Ctrl + R resets quiz, Escape closes modals.</span>
+      <span id="storageStatus">Local storage enabled</span>
+    </footer>
+  </div>
+
+  <dialog class="modal" id="answerModal" aria-labelledby="answerModalTitle">
+    <form method="dialog" class="modal-card">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow" id="questionMeta">Question</p>
+          <h2 id="answerModalTitle">Record Attempt</h2>
+        </div>
+        <button class="icon-button" id="closeAnswerModal" value="cancel" type="button" aria-label="Close modal">x</button>
+      </div>
+      <label for="attemptTeamSelect">Which team attempted?</label>
+      <select id="attemptTeamSelect"></select>
+      <div class="modal-actions">
+        <button class="button button-success" id="correctButton" type="button">Correct</button>
+        <button class="button button-danger" id="wrongButton" type="button">Wrong</button>
+        <button class="button button-secondary" id="passButton" type="button">Pass</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="confirmModal" aria-labelledby="confirmModalTitle">
+    <form method="dialog" class="modal-card">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Confirmation</p>
+          <h2 id="confirmModalTitle">Confirm Action</h2>
+        </div>
+        <button class="icon-button" id="cancelConfirmIcon" value="cancel" type="button" aria-label="Close confirmation">x</button>
+      </div>
+      <p id="confirmModalMessage" class="confirm-message"></p>
+      <div class="modal-actions">
+        <button class="button button-secondary" id="cancelConfirmButton" type="button">Cancel</button>
+        <button class="button button-danger" id="confirmActionButton" type="button">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-region" id="toastRegion" aria-live="assertive" aria-atomic="true"></div>
+
+  <script src="js/script.js"></script>
+</body>
+</html>
